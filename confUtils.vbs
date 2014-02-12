@@ -14,13 +14,16 @@ Dim DebugFlag 'обязательно глобальная переменная
   Dim ResDict 'as Dictionary 
   Dim ConfDict 'as Dictionary 
 
+  Dim strCOMConnector ' as string
+  Dim sFullClusterName ' as string
+
 '      Echo("WScript.ScriptFullName = " + WScript.ScriptFullName)
 Wscript.Quit( main() )
 
 '********************************************************************
 ' Возвращает 1 при успехе, 0 - при неудаче
 Function main( )
-    main = 0
+    main = 1
     
   'Make sure the host is csript, if not then abort
   VerifyHostIsCscript()
@@ -42,8 +45,10 @@ end if
     InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "User01" 'Имя ИБ
 
 	sFullServerName = ServerName
+	sFullClusterName = ServerName
 	if "" <> CStr(KlasterPortNumber) then
 		sFullServerName = ServerName + ":" + CStr(KlasterPortNumber)
+		sFullClusterName = ServerName + ":" + CStr(CInt(KlasterPortNumber)-1)
 	end if
 
     ServerName83 = ResDict.Item(LCase("ServerName83")) 
@@ -103,8 +108,13 @@ end if
     v8exe = ResDict.Item(LCase("v8exe")) ' "C:\Program Files (x86)\1cv82\8.2.18.96\bin\1cv8.exe" 'Путь к исполняемому файлу 1С:Предприятия 8.2
 	v83exe = ResDict.Item(LCase("v83exe"))
 		'rem NewPass = "" 'Новый пароль администратора, обновляющего ИБ
+    strCOMConnector = ResDict.Item(LCase("COMConnector"))
 
-    OpenLogFile
+    bSuccess = OpenLogFile
+    if not bSuccess then
+		Echo(CStr(Now) + " Не удалось изменить лог-файл. лог-файл заблокирован другой программой")
+		Exit Function
+    end if
 
     TimeBeginLock = Now ' Время начала блокировки ИБ
     TimeEndLock = DateAdd("h", 2, TimeBeginLock) ' Время окончания блокировки ИБ
@@ -113,11 +123,11 @@ end if
 
 	Echo(CStr(Now) + " НАЧАЛО ОБНОВЛЕНИЯ КОНФИГУРАЦИИ")
 
-    Echo(CStr(Now) + " Создание COM-коннектора")
-    Set ComConnector = CreateObject("v82.COMConnector")
+    'Echo(CStr(Now) + " Создание COM-коннектора")
+    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
 
     Echo(CStr(Now) + " Подключение к агенту сервера")
-    Set ServerAgent = ComConnector.ConnectAgent(ServerName)
+    Set ServerAgent = ComConnector.ConnectAgent(sFullClusterName) ' ComConnector.ConnectAgent(ServerName)
 
     Echo(CStr(Now) + " Получение массива кластеров сервера у агента сервера")
     Clasters = ServerAgent.GetClusters()
@@ -129,18 +139,21 @@ end if
     For i = LBound(Clasters) To UBound(Clasters)
                 'If Claster.MainPort = KlasterPortNumber Then
         Set Claster = Clasters(i)
+'Debug "UCase(Claster.HostName)", UCase(Claster.HostName)
+
         if (UCase(Claster.HostName) = UCase(ServerName)) then
             findClaster = true
             Exit for
         End if
     Next
     if findClaster = false then
-        Echo(CStr(Now) + " Ошибка - не нашли кластер <"+ServerName+">")
+        Echo(CStr(Now) + " Ошибка - не нашли кластер <"+sFullClusterName+">") 'ServerName
         Exit Function
     end if
             
-    Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.Name + ", "+Claster.HostName)
-
+    Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.ClusterName + ", "+Claster.HostName)
+	    'Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.Name + ", "+Claster.HostName)
+ 
     ServerAgent.Authenticate Claster, ClasterAdminName, ClasterAdminPass
 
     Echo(CStr(Now) + " Получение списка работающих рабочих процессов и обход в цикле")
@@ -184,7 +197,7 @@ end if
 
                     If Not FindInfoBase Then
                         Echo(CStr(Now) + " Не нашли нужную ИБ <"+InfoBaseName+">")
-                        Exit For
+                        Exit Function
                     End If
 
                     Echo(CStr(Now) + " Установка запрета на подключения к ИБ: " + InfoBase.Name)
@@ -210,7 +223,7 @@ end if
                     Next
 
                     ' Устанавливаем задержку выполнения
-                    Echo(CStr(Now) + " ВРЕМЕННО ОТКЛЮЧЕНО - Задержка перед началом завершения работы пользователей")
+                    Echo(CStr(Now) + " Задержка перед началом завершения работы пользователей")
                     'Echo(CStr(Now) + " Задержка перед началом завершения работы пользователей")
                     'set WshShell = WScript.CreateObject("WScript.Shell")
                     WScript.Sleep TimeSleep 
@@ -418,14 +431,17 @@ end if
         If fso.FileExists(NetFile) Then
             fso.DeleteFile(NetFile)
         End If
+Debug "Out", Out
+Debug "NetFile", NetFile
         fso.MoveFile Out, NetFile
+Debug "NetFile", NetFile
     End if
 
     If NeedDumpIB = True Then 
         CALL DelOldFiles(Folder, CountDB)
     End if
 
-    main = 1
+    main = 0
 End Function
 
 Function Show1CConfigLog(sTempFile, errorMessage)
@@ -451,7 +467,7 @@ End Function
 Sub WriteLogIntoIBEventLog(sFullServerName, InfoBaseName, sLogFile)
 		'Sub WriteLogIntoIBEventLog(ServerName, KlasterPortNumber, InfoBaseName, sLogFile)
     Echo(CStr(Now) + " Сохранение лога в журнал регистрации ИБ")
-    Set ComConnector = CreateObject("v82.COMConnector")
+    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
         'Set connection = ComConnector.Connect("Srvr=" + ServerName + ":" + CStr(KlasterPortNumber) + ";Ref=" + InfoBaseName + ";Usr=" + InfoBasesAdminName + ";Pwd=" + InfoBasesAdminPass)
     Set connection = ComConnector.Connect("Srvr=" + sFullServerName + ";Ref=" + InfoBaseName)
 
@@ -471,11 +487,18 @@ Sub WriteLogIntoIBEventLog(sFullServerName, InfoBaseName, sLogFile)
     f = Null
 End Sub
 
+Function CreateCOMConnector()
+    Echo(CStr(Now) + " Создание COM-коннектора <"+ strCOMConnector + ">")
+    Set ComConnector = CreateObject(strCOMConnector) ' CreateObject("v82.COMConnector")
+
+    set CreateCOMConnector = ComConnector
+End Function
+
 Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName)
     EnableConnections = false
     
-    Set ComConnector = CreateObject("v82.COMConnector")
-    Set ServerAgent = ComConnector.ConnectAgent(ServerName)
+    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
+    Set ServerAgent = ComConnector.ConnectAgent(sFullClusterName) 'ServerName)
     Clasters = ServerAgent.GetClusters()
 
     findClaster = false
@@ -489,7 +512,7 @@ Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoB
         End if
     Next
     if findClaster = false then
-        Echo(CStr(Now) + " Ошибка - не нашли кластер "+ServerName)
+        Echo(CStr(Now) + " Ошибка - не нашли кластер "+sFullClusterName) 'ServerName
         Exit Function
     end if
 
@@ -751,8 +774,20 @@ End Function
 
 Function OpenLogFile()
 	Echo sLogFile
+
+	on error resume next
     Set LogFile = fso.OpenTextFile(sLogFile, 8, True)
-    set OpenLogFile = LogFile
+  
+    if err.Number<>0 then
+    	err.Clear()
+        LogFile = nothing
+	    OpenLogFile = false
+	    on error goto 0
+	    Exit Function
+    end if
+	on error goto 0
+
+    OpenLogFile = true 'set OpenLogFile = LogFile
 End Function
 
 Sub Echo(text)
