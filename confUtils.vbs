@@ -42,7 +42,7 @@ end if
 
     ServerName = ResDict.Item(LCase("ServerName")) ' "WorkServer" 'Имя сервера БД
     KlasterPortNumber = ResDict.Item(LCase("KlasterPortNumber")) ' 1541 'Номер пора кластера
-    InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "User01" 'Имя ИБ
+    InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "IMOUT_User_01" 'Имя ИБ
 
 	sFullServerName = ServerName
 	sFullClusterName = ServerName
@@ -62,7 +62,7 @@ end if
 
     RepositoryPath = ResDict.Item(LCase("RepositoryPath")) ' "E:\Repository\test" ' путь к хранилищу
 
-		' ВАЖНО - база должна быть ранее зарегистрирована как server:port\baseName - например, WorkServer:1541\User01
+		' ВАЖНО - база должна быть ранее зарегистрирована как server:port\baseName - например, WorkServer:1541\IMOUT_User_01
 		' если база была зарегистрирована как server\baseName (без указания порта) - при работе с хранилищем будет ошибка из-за измененения местонахождения информационной базы
 		' если такой регистрации не было, не удается загрузить изменения из хранилища
 
