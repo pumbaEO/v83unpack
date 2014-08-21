@@ -42,7 +42,7 @@ end if
 
     ServerName = ResDict.Item(LCase("ServerName")) ' "WorkServer" 'Имя сервера БД
     KlasterPortNumber = ResDict.Item(LCase("KlasterPortNumber")) ' 1541 'Номер пора кластера
-    InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "IMOUT_User_01" 'Имя ИБ
+    InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "myBase_User_01" 'Имя ИБ
 
 	sFullServerName = ServerName
 	sFullClusterName = ServerName
@@ -62,7 +62,7 @@ end if
 
     RepositoryPath = ResDict.Item(LCase("RepositoryPath")) ' "E:\Repository\test" ' путь к хранилищу
 
-		' ВАЖНО - база должна быть ранее зарегистрирована как server:port\baseName - например, WorkServer:1541\IMOUT_User_01
+		' ВАЖНО - база должна быть ранее зарегистрирована как server:port\baseName - например, WorkServer:1541\myBase_User_01
 		' если база была зарегистрирована как server\baseName (без указания порта) - при работе с хранилищем будет ошибка из-за измененения местонахождения информационной базы
 		' если такой регистрации не было, не удается загрузить изменения из хранилища
 
@@ -123,6 +123,219 @@ end if
 
 	Echo(CStr(Now) + " НАЧАЛО ОБНОВЛЕНИЯ КОНФИГУРАЦИИ")
 
+    FindInfoBase = DisableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName)
+
+    If NeedRestartAgent Then
+        RestartAgent TimeSleepShort
+    End If
+
+    If FindInfoBase Then
+
+        'Покажем свободное место на диске с исполняемым файлом 1С
+        Echo(CStr(Now) + " " + ShowFreeSpace(v8exe))
+        'Покажем свободное место на диске с архивами
+        Echo(CStr(Now) + " " + ShowFreeSpace(Folder))
+        
+		If NeedRestoreIB Then
+			Echo(CStr(Now) + " Восстановление эталонной базы")
+
+			strCommLine = " /RestoreIB """ + IBFile + """"
+
+			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+			LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + strCommLine + " /Out""" + sTempFile +""""
+			Echo(CStr(Now) + " ком.строка запуска: " + LineExe)
+
+			wshShell.Run LineExe, 5, True
+
+			Show1CConfigLog sTempFile, " Ошибка при загрузке базы из файла"
+		End If
+
+		if NeedUpdateFromStorage then
+			Echo(CStr(Now) + " Обновление конфигурации из хранилища")
+			
+			strRepository = " /ConfigurationRepositoryF"""+RepositoryPath+""""
+			strRepository = strRepository + " /ConfigurationRepositoryN"""+RepositoryAdminName + """ /ConfigurationRepositoryP"""+RepositoryAdminPass+""""
+			
+			UpdateFromStorage = " /ConfigurationRepositoryUpdateCfg -v -force -revised " ' обновляем из хранилища
+			' /LoadCfg — загрузка конфигурации из файла; 
+			' /UpdateCfg — обновление конфигурации, находящейся на поддержке; 
+			' /ConfigurationRepositoryUpdateCfg — обновление конфигурации из хранилища; 
+			' /LoadConfigFiles — загрузить файлы конфигурации.
+
+			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+			
+			LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " +UpdateFromStorage + strRepository + " /Out""" + sTempFile +""""
+			Echo(CStr(Now) + " ком.строка запуска: "+LineExe)
+			'LogFile.Close()
+			'LogFile = ""
+
+			' Обновим конфигурацию из хранилища
+			wshShell.Run LineExe, 5, True
+
+			' анализирую лог работы конфигуратора, т.к могут быть ошибки, например, Ошибка при выполнении операции с информационной базой или Ошибка обновления конфигурации из хранилища
+			'или Для выполнения операции требуется получение объектов:
+			'или  Операция с хранилищем конфигурации отменена
+			' также лог конфигуратора показываю в своем логе
+			Show1CConfigLog sTempFile, " Ошибка при обновлении конфигурации из хранилища"
+		end if ' NeedUpdateFromStorage
+		
+        Echo(CStr(Now) + " Обновление конфигурации ИБ") 'EchoWithOpenAndCloseLog
+
+		sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+        LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + " /UpdateDBCfg -Server /Out""" + sTempFile + """ -NoTruncate"
+        Echo(CStr(Now) + " ком.строка запуска: "+LineExe) ' EchoWithOpenAndCloseLog
+
+        ' Обновим конфигурацию БД
+        wshShell.Run LineExe, 5, True
+
+		' анализирую лог работы конфигуратора, т.к могут быть ошибки и база не обновится
+		' также лог конфигуратора показываю в своем логе
+		Show1CConfigLog sTempFile, " Ошибка при обновлении базы данных"
+		
+        If NeedTestIB = True Then
+            Echo(CStr(Now) + " тестируем базу и пересчитываем итоги.") ' EchoWithOpenAndCloseLog
+
+			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+			
+            LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /IBCheckAndRepair -LogIntegrity -RecalcTotals /Out""" + sTempFile + """ -NoTruncate"
+            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
+
+            wshShell.Run LineExe, 5, True
+
+			Show1CConfigLog sTempFile, " Ошибка при выгрузке базы данных"
+        End if
+        
+        if NeedStartIB then
+            Echo(CStr(Now) + " обновляем базу в режиме Предприятия.") ' EchoWithOpenAndCloseLog
+
+			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+            EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, True
+
+            LineExe = """" + v8exe + """ ENTERPRISE /CCLOSE /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /Out""" + sTempFile + """ -NoTruncate"
+            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
+
+            wshShell.Run LineExe, 5, True
+
+    		DisableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName
+
+			Show1CConfigLog sTempFile, " Ошибка при обновлении базы в режиме Предприятия"
+        end if
+
+        If FSO.FolderExists(Folder) = False Then
+            FSO.CreateFolder Folder
+        End if
+        
+        If NeedDumpIB = True Then
+            Echo(CStr(Now) + " выгружаем базу данных в архив") ' EchoWithOpenAndCloseLog
+			
+			formatDate = GetFormatDay
+			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+            LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /DumpIB""" + Folder + Prefix + formatDate + ".dt"" /Out""" + sTempFile + """ -NoTruncate"
+            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
+
+            wshShell.Run LineExe, 5, True
+
+			haveProblem = Show1CConfigLog(sTempFile, " Ошибка при выгрузке базы данных")
+			If Not haveProblem And NeedRestoreIB83 Then
+    			Echo(CStr(Now) + " Восстановление базы в 8.3")
+
+    			strCommLine = " /RestoreIB """ + Folder + Prefix + formatDate + ".dt"""
+
+    			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+    			LineExe = """" + v83exe + """ DESIGNER /S """ + sFullServerName83 + "\" + InfoBaseName83 + """ /UC """ + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + strCommLine + " /Out """ + sTempFile +""""
+    			Echo(CStr(Now) + " ком.строка запуска: " + LineExe)
+
+    			wshShell.Run LineExe, 5, True
+
+    			Show1CConfigLog sTempFile, " Ошибка при загрузке базы из файла"
+			End If
+        End if
+		
+        'OpenLogFile
+
+        Echo(CStr(Now) + " Установка разрешения подключения к ИБ")
+
+        FindInfoBase = False
+        
+        EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, False
+
+    End If ' FindInfoBase
+
+    WriteLogIntoIBEventLog sFullServerName, InfoBaseName, sLogFile
+
+    If NeedCopyFiles = True Then 
+        If fso.FileExists(NetFile) Then
+            fso.DeleteFile(NetFile)
+        End If
+Debug "Out", Out
+Debug "NetFile", NetFile
+        fso.MoveFile Out, NetFile
+Debug "NetFile", NetFile
+    End if
+
+    If NeedDumpIB = True Then 
+        CALL DelOldFiles(Folder, CountDB)
+    End if
+
+    main = 0
+End Function
+
+Function Show1CConfigLog(sTempFile, errorMessage)
+	Set configLogFile = fso.OpenTextFile(sTempFile, 1)
+
+	haveProblem = false
+	Do While configLogFile.AtEndOfStream <> True
+		errorString = configLogFile.ReadLine
+		Echo errorString
+		errorPos = InStr(1, errorString, "Ошибка", 1)
+		If errorPos > 0 Then
+			haveProblem = true
+		end if
+	Loop
+	if haveProblem = true then
+		Echo(CStr(Now) + errorMessage) ' EchoWithOpenAndCloseLog '" Ошибка при обновлении конфигурации из хранилища")
+	end if
+	configLogFile.Close()
+
+	Show1CConfigLog = haveProblem
+End Function
+
+Sub WriteLogIntoIBEventLog(sFullServerName, InfoBaseName, sLogFile)
+		'Sub WriteLogIntoIBEventLog(ServerName, KlasterPortNumber, InfoBaseName, sLogFile)
+    Echo(CStr(Now) + " Сохранение лога в журнал регистрации ИБ")
+    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
+        'Set connection = ComConnector.Connect("Srvr=" + ServerName + ":" + CStr(KlasterPortNumber) + ";Ref=" + InfoBaseName + ";Usr=" + InfoBasesAdminName + ";Pwd=" + InfoBasesAdminPass)
+    Set connection = ComConnector.Connect("Srvr=" + sFullServerName + ";Ref=" + InfoBaseName)
+
+    Echo(CStr(Now) + " ЗАВЕРШЕНИЕ ОБНОВЛЕНИЯ КОНФИГУРАЦИИ")
+
+    'LogFile.Close()
+    'LogFile = ""
+
+    Set f = fso.OpenTextFile(sLogFile, 1, False, -2) 'Out
+    Text = f.ReadAll
+
+    'Запишем всю информацию из log-файла в журнал регистрации
+    connection.WriteLogEvent "Регламентное обновление ИБ", connection.EventLogLevel.Information,,, Text
+
+    connection = Null
+    ComConnector = Null
+    f = Null
+End Sub
+
+Function CreateCOMConnector()
+    Echo(CStr(Now) + " Создание COM-коннектора <"+ strCOMConnector + ">")
+    Set ComConnector = CreateObject(strCOMConnector) ' CreateObject("v82.COMConnector")
+
+    set CreateCOMConnector = ComConnector
+End Function
+
+Function DisableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName)
     'Echo(CStr(Now) + " Создание COM-коннектора")
     Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
 
@@ -157,8 +370,6 @@ end if
     ServerAgent.Authenticate Claster, ClasterAdminName, ClasterAdminPass
 
     Echo(CStr(Now) + " Получение списка работающих рабочих процессов и обход в цикле")
-
-    FindInfoBase = False
 
     WorkServers = ServerAgent.GetWorkingServers(Claster)
     For i = LBound(WorkServers) To UBound(WorkServers)
@@ -272,12 +483,9 @@ end if
                 End If
 
                 Echo(CStr(Now) + " Окончание завершения работы пользователей")
-
             End If
-
         Next
-
-    next
+    Next
 
     ComConnector = Null
     ServerAgent = Null
@@ -288,213 +496,10 @@ end if
     InfoBase = Null
     Connections = Null
 
-    If NeedRestartAgent Then
-        RestartAgent TimeSleepShort
-    End If
-
-    If FindInfoBase Then
-
-        'Покажем свободное место на диске с исполняемым файлом 1С
-        Echo(CStr(Now) + " " + ShowFreeSpace(v8exe))
-        'Покажем свободное место на диске с архивами
-        Echo(CStr(Now) + " " + ShowFreeSpace(Folder))
-        
-		If NeedRestoreIB Then
-			Echo(CStr(Now) + " Восстановление эталонной базы")
-
-			strCommLine = " /RestoreIB """ + IBFile + """"
-
-			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-			LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + strCommLine + " /Out""" + sTempFile +""""
-			Echo(CStr(Now) + " ком.строка запуска: " + LineExe)
-
-			wshShell.Run LineExe, 5, True
-
-			Show1CConfigLog sTempFile, " Ошибка при загрузке базы из файла"
-		End If
-
-		if NeedUpdateFromStorage then
-			Echo(CStr(Now) + " Обновление конфигурации из хранилища")
-			
-			strRepository = " /ConfigurationRepositoryF"""+RepositoryPath+""""
-			strRepository = strRepository + " /ConfigurationRepositoryN"""+RepositoryAdminName + """ /ConfigurationRepositoryP"""+RepositoryAdminPass+""""
-			
-			UpdateFromStorage = " /ConfigurationRepositoryUpdateCfg -v -force -revised " ' обновляем из хранилища
-			' /LoadCfg — загрузка конфигурации из файла; 
-			' /UpdateCfg — обновление конфигурации, находящейся на поддержке; 
-			' /ConfigurationRepositoryUpdateCfg — обновление конфигурации из хранилища; 
-			' /LoadConfigFiles — загрузить файлы конфигурации.
-
-			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-			
-			LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " +UpdateFromStorage + strRepository + " /Out""" + sTempFile +""""
-			Echo(CStr(Now) + " ком.строка запуска: "+LineExe)
-			'LogFile.Close()
-			'LogFile = ""
-
-			' Обновим конфигурацию из хранилища
-			wshShell.Run LineExe, 5, True
-
-			' анализирую лог работы конфигуратора, т.к могут быть ошибки, например, Ошибка при выполнении операции с информационной базой или Ошибка обновления конфигурации из хранилища
-			'или Для выполнения операции требуется получение объектов:
-			'или  Операция с хранилищем конфигурации отменена
-			' также лог конфигуратора показываю в своем логе
-			Show1CConfigLog sTempFile, " Ошибка при обновлении конфигурации из хранилища"
-		end if ' NeedUpdateFromStorage
-		
-        Echo(CStr(Now) + " Обновление конфигурации ИБ") 'EchoWithOpenAndCloseLog
-
-		sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-        LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + " /UpdateDBCfg -Server /Out""" + sTempFile + """ -NoTruncate"
-        Echo(CStr(Now) + " ком.строка запуска: "+LineExe) ' EchoWithOpenAndCloseLog
-
-        ' Обновим конфигурацию БД
-        wshShell.Run LineExe, 5, True
-
-		' анализирую лог работы конфигуратора, т.к могут быть ошибки и база не обновится
-		' также лог конфигуратора показываю в своем логе
-		Show1CConfigLog sTempFile, " Ошибка при обновлении базы данных"
-		
-        If FSO.FolderExists(Folder) = False Then
-            FSO.CreateFolder Folder
-        End if
-        
-        If NeedDumpIB = True Then
-            Echo(CStr(Now) + " выгружаем базу данных в архив") ' EchoWithOpenAndCloseLog
-			
-			formatDate = GetFormatDay
-			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-            LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /DumpIB""" + Folder + Prefix + formatDate + ".dt"" /Out""" + sTempFile + """ -NoTruncate"
-            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
-
-            wshShell.Run LineExe, 5, True
-
-			haveProblem = Show1CConfigLog(sTempFile, " Ошибка при выгрузке базы данных")
-			If Not haveProblem And NeedRestoreIB83 Then
-    			Echo(CStr(Now) + " Восстановление базы в 8.3")
-
-    			strCommLine = " /RestoreIB """ + Folder + Prefix + formatDate + ".dt"""
-
-    			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-    			LineExe = """" + v83exe + """ DESIGNER /S """ + sFullServerName83 + "\" + InfoBaseName83 + """ /UC """ + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + strCommLine + " /Out """ + sTempFile +""""
-    			Echo(CStr(Now) + " ком.строка запуска: " + LineExe)
-
-    			wshShell.Run LineExe, 5, True
-
-    			Show1CConfigLog sTempFile, " Ошибка при загрузке базы из файла"
-			End If
-        End if
-		
-        If NeedTestIB = True Then
-            Echo(CStr(Now) + " тестируем базу и пересчитываем итоги.") ' EchoWithOpenAndCloseLog
-
-			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-			
-            LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /IBCheckAndRepair -LogIntegrity -RecalcTotals /Out""" + sTempFile + """ -NoTruncate"
-            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
-
-            wshShell.Run LineExe, 5, True
-
-			Show1CConfigLog sTempFile, " Ошибка при выгрузке базы данных"
-        End if
-        
-        if NeedStartIB then
-            Echo(CStr(Now) + " обновляем базу в режиме Предприятия.") ' EchoWithOpenAndCloseLog
-
-			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-            LineExe = """" + v8exe + """ ENTERPRISE /CCLOSE /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /Out""" + sTempFile + """ -NoTruncate"
-            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
-
-            wshShell.Run LineExe, 5, True
-
-			Show1CConfigLog sTempFile, " Ошибка при обновлении базы в режиме Предприятия"
-        end if
-
-        'OpenLogFile
-
-        Echo(CStr(Now) + " Установка разрешения подключения к ИБ")
-
-        FindInfoBase = False
-        
-        EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName
-
-    End If ' FindInfoBase
-
-    WriteLogIntoIBEventLog sFullServerName, InfoBaseName, sLogFile
-
-    If NeedCopyFiles = True Then 
-        If fso.FileExists(NetFile) Then
-            fso.DeleteFile(NetFile)
-        End If
-Debug "Out", Out
-Debug "NetFile", NetFile
-        fso.MoveFile Out, NetFile
-Debug "NetFile", NetFile
-    End if
-
-    If NeedDumpIB = True Then 
-        CALL DelOldFiles(Folder, CountDB)
-    End if
-
-    main = 0
+	DisableConnections = FindInfoBase
 End Function
 
-Function Show1CConfigLog(sTempFile, errorMessage)
-	Set configLogFile = fso.OpenTextFile(sTempFile, 1)
-
-	haveProblem = false
-	Do While configLogFile.AtEndOfStream <> True
-		errorString = configLogFile.ReadLine
-		Echo errorString
-		errorPos = InStr(1, errorString, "Ошибка", 1)
-		If errorPos > 0 Then
-			haveProblem = true
-		end if
-	Loop
-	if haveProblem = true then
-		Echo(CStr(Now) + errorMessage) ' EchoWithOpenAndCloseLog '" Ошибка при обновлении конфигурации из хранилища")
-	end if
-	configLogFile.Close()
-
-	Show1CConfigLog = haveProblem
-End Function
-
-Sub WriteLogIntoIBEventLog(sFullServerName, InfoBaseName, sLogFile)
-		'Sub WriteLogIntoIBEventLog(ServerName, KlasterPortNumber, InfoBaseName, sLogFile)
-    Echo(CStr(Now) + " Сохранение лога в журнал регистрации ИБ")
-    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
-        'Set connection = ComConnector.Connect("Srvr=" + ServerName + ":" + CStr(KlasterPortNumber) + ";Ref=" + InfoBaseName + ";Usr=" + InfoBasesAdminName + ";Pwd=" + InfoBasesAdminPass)
-    Set connection = ComConnector.Connect("Srvr=" + sFullServerName + ";Ref=" + InfoBaseName)
-
-    Echo(CStr(Now) + " ЗАВЕРШЕНИЕ ОБНОВЛЕНИЯ КОНФИГУРАЦИИ")
-
-    'LogFile.Close()
-    'LogFile = ""
-
-    Set f = fso.OpenTextFile(sLogFile, 1, False, -2) 'Out
-    Text = f.ReadAll
-
-    'Запишем всю информацию из log-файла в журнал регистрации
-    connection.WriteLogEvent "Регламентное обновление ИБ", connection.EventLogLevel.Information,,, Text
-
-    connection = Null
-    ComConnector = Null
-    f = Null
-End Sub
-
-Function CreateCOMConnector()
-    Echo(CStr(Now) + " Создание COM-коннектора <"+ strCOMConnector + ">")
-    Set ComConnector = CreateObject(strCOMConnector) ' CreateObject("v82.COMConnector")
-
-    set CreateCOMConnector = ComConnector
-End Function
-
-Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName)
+Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, ConnectionsOnly)
     EnableConnections = false
     
     Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
@@ -548,7 +553,9 @@ Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoB
                 If FindInfoBase Then
                     ' Устанавливаем разрешение на подключение соединений
                     InfoBase.ConnectDenied = False
-                    InfoBase.ScheduledJobsDenied = false
+                    If Not ConnectionsOnly Then
+                        InfoBase.ScheduledJobsDenied = false
+                    End If
                     InfoBase.DeniedMessage = ""
                     InfoBase.PermissionCode = ""
                     ConnectToWorkProcess.UpdateInfoBase(InfoBase)
