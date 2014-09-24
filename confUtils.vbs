@@ -102,9 +102,9 @@ end if
     LockMessageText = ResDict.Item(LCase("LockMessageText")) ' "Идет регламент. Подождите..." 'Текст сообщения о блокировки подключений к ИБ
     LockPermissionCode = ResDict.Item(LCase("LockPermissionCode")) ' "Артур" 'Ключ для запуска заблокированной ИБ
     AuthStr = ResDict.Item(LCase("AuthStr")) ' "/WA+" 
-    TimeSleep = CInt(ResDict.Item(LCase("TimeSleep"))) ' 10000 '600000 '10 секунд 600 секунд
+    TimeSleep = CLng(ResDict.Item(LCase("TimeSleep"))) ' 10000 '600000 '10 секунд 600 секунд
 
-    TimeSleepShort = CInt(ResDict.Item(LCase("TimeSleepShort"))) ' 2000 '60000 '2 секунд 60 секунд
+    TimeSleepShort = CLng(ResDict.Item(LCase("TimeSleepShort"))) ' 2000 '60000 '2 секунд 60 секунд
     Cfg = ResDict.Item(LCase("Cfg")) ' "" 'Путь к файлу с измененной конфигурацией
     InfoCfgFile = ResDict.Item(LCase("InfoCfgFile")) ' "" 'Информация о файле обновления конфигурации
     v8exe = ResDict.Item(LCase("v8exe")) ' "C:\Program Files (x86)\1cv82\8.2.18.96\bin\1cv8.exe" 'Путь к исполняемому файлу 1С:Предприятия 8.2
