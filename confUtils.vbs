@@ -214,14 +214,14 @@ end if
 
 			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
 
-            EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, True
+            'EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, True
 
             LineExe = """" + v8exe + """ ENTERPRISE /CCLOSE /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /Out""" + sTempFile + """ -NoTruncate"
             Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
 
             wshShell.Run LineExe, 5, True
 
-    		DisableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, TimeSleep
+    		'DisableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, TimeSleepShort
 
 			Show1CConfigLog sTempFile, " Ошибка при обновлении базы в режиме Предприятия"
         end if
