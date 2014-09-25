@@ -1,4 +1,4 @@
-' Инициализируем необходимые переменные
+option explicit
 on error goto 0
 
 ' следующие две строки для вывода отладочных сообщений
@@ -17,280 +17,100 @@ Dim DebugFlag 'обязательно глобальная переменная
   Dim strCOMConnector ' as string
   Dim sFullClusterName ' as string
 
-'      Echo("WScript.ScriptFullName = " + WScript.ScriptFullName)
+  Dim ServerName
+  Dim KlasterPortNumber
+  Dim InfoBaseName
+
+  Dim sFullServerName
+
+  Dim ServerName83
+    Dim KlasterPortNumber83
+    Dim InfoBaseName83
+
+	Dim sFullServerName83
+
+    Dim RepositoryPath
+
+    Dim ClasterAdminName
+    Dim ClasterAdminPass
+    Dim InfoBasesAdminName
+    Dim InfoBasesAdminPass
+    Dim RepositoryAdminName
+    Dim RepositoryAdminPass
+
+    Dim NetFile
+
+    Dim Folder
+    Dim CountDB
+    Dim Prefix
+    Dim Out
+
+	Dim NeedUpdateFromStorage
+    Dim NeedDumpIB
+    Dim NeedCopyFiles
+    Dim NeedTestIB
+    Dim NeedRestartAgent
+    Dim NeedRestoreIB
+    Dim NeedRestoreIB83
+    Dim NeedStartIB
+        
+    Dim IBFile
+    Dim LockMessageText
+    Dim LockPermissionCode
+    Dim AuthStr
+    Dim TimeSleep
+
+    Dim TimeSleepShort
+    Dim Cfg
+    Dim InfoCfgFile
+    Dim v8exe
+	Dim v83exe
+
+    Dim TimeBeginLock
+    Dim TimeEndLock
+
 Wscript.Quit( main() )
 
 '********************************************************************
-' Возвращает 1 при успехе, 0 - при неудаче
+' Возвращает 0 при успехе, 1 - при неудаче
 Function main( )
     main = 1
     
   'Make sure the host is csript, if not then abort
   VerifyHostIsCscript()
   
-' проверить версию Windows Script Host
+  ' проверить версию Windows Script Host
   if CDbl(replace(WScript.Version,".",","))<5.6 then
     Echo "Для работы сценария требуется Windows Script Host версии 5.6 и выше !"
     Exit Function
   end if  
 
-' Инициализация сценария
-if not Init() then
-  Exit Function
-end if
-'Exit Function
-
-    ServerName = ResDict.Item(LCase("ServerName")) ' "WorkServer" 'Имя сервера БД
-    KlasterPortNumber = ResDict.Item(LCase("KlasterPortNumber")) ' 1541 'Номер пора кластера
-    InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "IMOUT_User_01" 'Имя ИБ
-
-	sFullServerName = ServerName
-	sFullClusterName = ServerName
-	if "" <> CStr(KlasterPortNumber) then
-		sFullServerName = ServerName + ":" + CStr(KlasterPortNumber)
-		sFullClusterName = ServerName + ":" + CStr(CInt(KlasterPortNumber)-1)
+	' Инициализация сценария
+	if not Init() then
+	  Exit Function
 	end if
 
-    ServerName83 = ResDict.Item(LCase("ServerName83")) 
-    KlasterPortNumber83 = ResDict.Item(LCase("KlasterPortNumber83")) 
-    InfoBaseName83 = ResDict.Item(LCase("InfoBaseName83")) 
+	LoadSettings()
 
-	sFullServerName83 = ServerName83
-	if "" <> CStr(KlasterPortNumber83) then
-		sFullServerName83 = sFullServerName83 + ":" + CStr(KlasterPortNumber83)
-	end if
-
-    RepositoryPath = ResDict.Item(LCase("RepositoryPath")) ' "E:\Repository\test" ' путь к хранилищу
-
-		' ВАЖНО - база должна быть ранее зарегистрирована как server:port\baseName - например, WorkServer:1541\IMOUT_User_01
-		' если база была зарегистрирована как server\baseName (без указания порта) - при работе с хранилищем будет ошибка из-за измененения местонахождения информационной базы
-		' если такой регистрации не было, не удается загрузить изменения из хранилища
-
-    ' ВАЖНО не должен быть запущен процесс Конфигуратора с подключением к хранилищу с таким пользователем !
-    ' будет ошибка - (Пользователь уже аутентифицирован в хранилище.)
-
-    ClasterAdminName = ResDict.Item(LCase("ClasterAdminName")) ' "" 'Имя администратора кластера
-    ClasterAdminPass = ResDict.Item(LCase("ClasterAdminPass")) ' "" 'Пароль администратора кластера
-    InfoBasesAdminName = ResDict.Item(LCase("InfoBasesAdminName")) ' "Администратор1" 'Имя администратора ИБ
-    InfoBasesAdminPass = ResDict.Item(LCase("InfoBasesAdminPass")) ' "" 'Пароль администратора ИБ
-    RepositoryAdminName = ResDict.Item(LCase("RepositoryAdminName")) ' "Администратор" ' Имя администратора хранилища
-    RepositoryAdminPass = ResDict.Item(LCase("RepositoryAdminPass")) ' "" ' Пароль администратора хранилища
-
-		'FilePath = ResDict.Item(LCase("FilePath")) ' "\\WorkServer\Share\Admin1C\confupdate.vbs" 'Путь к текущему файлу
-    NetFile = ResDict.Item(LCase("NetFile")) ' "\\WorkServer\Share\Admin1C\confupdate_base.txt" 'Путь к log-файлу в сети - используется только для NeedCopyFiles = True
-
-    Folder = ResDict.Item(LCase("Folder")) ' "\\WorkServer\Share\Admin1C\" 'Каталог для выгрузки базы
-    CountDB = CInt(ResDict.Item(LCase("CountDB"))) ' 7 'За сколько дней хранить копии
-    Prefix = ResDict.Item(LCase("Prefix")) ' "base" 'Префикс файла выгрузки
-    Out = ResDict.Item(LCase(LCase("LogFile"))) ' "\\WorkServer\Share\Admin1C\confupdate.txt" 'Путь к log-файлу
-    sLogFile = Out
-    Debug "Out", Out
-
-		'UpdateFromStorage = ResDict.Item(LCase("UpdateFromStorage")) ' " /ConfigurationRepositoryUpdateCfg -v -force -revised " ' обновляем из хранилища
-
-	NeedUpdateFromStorage = UCase(ResDict.Item(LCase("NeedUpdateFromStorage"))) = "TRUE" ' Необходимость обновления конфигурации из хранилища конфигурации
-    NeedDumpIB = UCase(ResDict.Item(LCase("NeedDumpIB"))) = "TRUE" ' True ' Необходимость выгрузки базы
-    NeedCopyFiles = UCase(ResDict.Item(LCase("NeedCopyFiles"))) = "TRUE" ' True ' Необходимость выгрузки базы
-    NeedTestIB = UCase(ResDict.Item(LCase("NeedTestIB"))) = "TRUE" ' False ' Необходимость тестирования базы
-    NeedRestartAgent = UCase(ResDict.Item(LCase("NeedRestartAgent"))) = "TRUE" ' False ' Необходимость рестарта агента сервера
-    NeedRestoreIB = UCase(ResDict.Item(LCase("NeedRestoreIB"))) = "TRUE" ' Необходимость восстановления конфигурации из файла
-    NeedRestoreIB83 = UCase(ResDict.Item(LCase("NeedRestoreIB83"))) = "TRUE" ' Необходимость восстановления конфигурации из файла платформой 8.3
-    NeedStartIB = UCase(ResDict.Item(LCase("NeedStartIB"))) = "TRUE" ' Необходимость запуска 1С после обновления из хранилища для обновления в режиме Предприятия
-        
-    IBFile = ResDict.Item(LCase("IBFile")) ' "" 'Путь к файлу с выгрузкой базы
-    LockMessageText = ResDict.Item(LCase("LockMessageText")) ' "Идет регламент. Подождите..." 'Текст сообщения о блокировки подключений к ИБ
-    LockPermissionCode = ResDict.Item(LCase("LockPermissionCode")) ' "Артур" 'Ключ для запуска заблокированной ИБ
-    AuthStr = ResDict.Item(LCase("AuthStr")) ' "/WA+" 
-    TimeSleep = ResDict.Item(LCase("TimeSleep")) ' 10000 '600000 '10 секунд 600 секунд
-    TimeSleepShort = ResDict.Item(LCase("TimeSleepShort")) ' 2000 '60000 '2 секунд 60 секунд
-    Cfg = ResDict.Item(LCase("Cfg")) ' "" 'Путь к файлу с измененной конфигурацией
-    InfoCfgFile = ResDict.Item(LCase("InfoCfgFile")) ' "" 'Информация о файле обновления конфигурации
-    v8exe = ResDict.Item(LCase("v8exe")) ' "C:\Program Files (x86)\1cv82\8.2.18.96\bin\1cv8.exe" 'Путь к исполняемому файлу 1С:Предприятия 8.2
-	v83exe = ResDict.Item(LCase("v83exe"))
-		'rem NewPass = "" 'Новый пароль администратора, обновляющего ИБ
-    strCOMConnector = ResDict.Item(LCase("COMConnector"))
-
+    Dim bSuccess
     bSuccess = OpenLogFile
     if not bSuccess then
 		Echo(CStr(Now) + " Не удалось изменить лог-файл. лог-файл заблокирован другой программой")
 		Exit Function
     end if
 
-    TimeBeginLock = Now ' Время начала блокировки ИБ
-    TimeEndLock = DateAdd("h", 2, TimeBeginLock) ' Время окончания блокировки ИБ
-
     Debug "ServerName", ServerName
 
 	Echo(CStr(Now) + " НАЧАЛО ОБНОВЛЕНИЯ КОНФИГУРАЦИИ")
 
-    'Echo(CStr(Now) + " Создание COM-коннектора")
-    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
-
-    Echo(CStr(Now) + " Подключение к агенту сервера")
-    Set ServerAgent = ComConnector.ConnectAgent(sFullClusterName) ' ComConnector.ConnectAgent(ServerName)
-
-    Echo(CStr(Now) + " Получение массива кластеров сервера у агента сервера")
-    Clasters = ServerAgent.GetClusters()
-
-    Echo(CStr(Now) + " Начало завершения работы пользователей")
-
-    Echo(CStr(Now) + " Начало цикла нахождения необходимого кластера по имени")
-    findClaster = false
-    For i = LBound(Clasters) To UBound(Clasters)
-                'If Claster.MainPort = KlasterPortNumber Then
-        Set Claster = Clasters(i)
-'Debug "UCase(Claster.HostName)", UCase(Claster.HostName)
-
-        if (UCase(Claster.HostName) = UCase(ServerName)) then
-            findClaster = true
-            Exit for
-        End if
-    Next
-    if findClaster = false then
-        Echo(CStr(Now) + " Ошибка - не нашли кластер <"+sFullClusterName+">") 'ServerName
-        Exit Function
-    end if
-            
-    Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.ClusterName + ", "+Claster.HostName)
-	    'Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.Name + ", "+Claster.HostName)
- 
-    ServerAgent.Authenticate Claster, ClasterAdminName, ClasterAdminPass
-
-    Echo(CStr(Now) + " Получение списка работающих рабочих процессов и обход в цикле")
-
-    FindInfoBase = False
-
-    WorkServers = ServerAgent.GetWorkingServers(Claster)
-    For i = LBound(WorkServers) To UBound(WorkServers)
-        Set WorkServer = WorkServers(i)
-        Echo(CStr(Now) + " Обрабатываю рабочий сервер "+WorkServer.Name+": " + WorkServer.HostName)
-
-        WorkingProcesses = ServerAgent.GetServerWorkingProcesses(Claster, WorkServer)
-			'set WorkingProcesses = ServerAgent.GetWorkingProcesses(Claster, WorkServer)
-			'Если РабочиеПроцессы <> НЕОПРЕДЕЛЕНО Тогда
-
-        For j = LBound(WorkingProcesses) To UBound(WorkingProcesses)
-
-            If WorkingProcesses(j).Running = 1 Then
-
-                Echo(CStr(Now) + " Создание соединения с рабочим процессом " + WorkingProcesses(j).HostName + ":" + CStr(WorkingProcesses(j).MainPort))
-                Set ConnectToWorkProcess = ComConnector.ConnectWorkingProcess("tcp://" + WorkingProcesses(j).HostName + ":" + CStr(WorkingProcesses(j).MainPort))
-
-                ConnectToWorkProcess.AuthenticateAdmin ClasterAdminName, ClasterAdminPass
-                ConnectToWorkProcess.AddAuthentication InfoBasesAdminName, InfoBasesAdminPass
-
-                If Not FindInfoBase Then
-
-                    Echo(CStr(Now) + " Получение списка ИБ рабочего процесса")
-                    InfoBases = ConnectToWorkProcess.GetInfoBases()
-
-                    Echo(CStr(Now) + " Поиск нужной ИБ")
-                    For h = LBound(InfoBases) To UBound(InfoBases)
-                        Echo(CStr(Now) + " Обрабатывается ИБ: " + InfoBases(h).Name)
-                        If LCase(InfoBases(h).Name) = LCase(InfoBaseName) Then
-                            Set InfoBase = InfoBases(h)
-                            FindInfoBase = True
-                            Echo(CStr(Now) + " Нашли нужную ИБ")
-                            Exit For
-                        End If
-                    Next
-
-                    If Not FindInfoBase Then
-                        Echo(CStr(Now) + " Не нашли нужную ИБ <"+InfoBaseName+">")
-                        Exit Function
-                    End If
-
-                    Echo(CStr(Now) + " Установка запрета на подключения к ИБ: " + InfoBase.Name)
-                    InfoBase.ConnectDenied = True
-                    InfoBase.ScheduledJobsDenied = True
-                    InfoBase.DeniedFrom = TimeBeginLock
-                    InfoBase.DeniedTo   = TimeEndLock
-                    InfoBase.DeniedMessage = LockMessageText
-                    InfoBase.PermissionCode = LockPermissionCode
-                    ConnectToWorkProcess.UpdateInfoBase(InfoBase)
-
-                    InfoBases = ServerAgent.GetInfoBases(Claster)
-
-                    Echo(CStr(Now) + " Поиск нужной ИБ для сессии")
-                    For h = LBound(InfoBases) To UBound(InfoBases)
-                        Echo(CStr(Now) + " Обрабатывается ИБ: " + InfoBases(h).Name)
-                        If LCase(InfoBases(h).Name) = LCase(InfoBaseName) Then
-                            Set InfoBaseSession = InfoBases(h)
-								'FindInfoBase = True
-                            Echo(CStr(Now) + " Нашли нужную ИБ для сессии")
-                            Exit For
-                        End If
-                    Next
-
-                    ' Устанавливаем задержку выполнения
-                    Echo(CStr(Now) + " Задержка перед началом завершения работы пользователей")
-                    'Echo(CStr(Now) + " Задержка перед началом завершения работы пользователей")
-                    'set WshShell = WScript.CreateObject("WScript.Shell")
-                    WScript.Sleep TimeSleep 
-
-                End If
-
-                Echo(CStr(Now) + " Начало завершение работы пользователей с ИБ " + InfoBase.Name)
-                If FindInfoBase Then
-
-                    Echo(CStr(Now) + " Обработка списка сеансов")
-                    Sessions = ServerAgent.GetInfoBaseSessions(Claster, InfoBaseSession)
-                    For k = LBound(Sessions) To UBound(Sessions)
-                        Set Session = Sessions(k)
-                        UserName = Session.UserName
-							'ConnID    = Session.ConnID;
-                        AppID    = UCase(Session.AppID)        
-                        
-							'Если НЕ отключаемКонфигуратор И нРег(AppID) = "designer" Тогда
-							'//Если нРег(AppID) = "backgroundjob" ИЛИ нРег(AppID) = "designer" Тогда
-							'    // если это сеансы конфигуратора или фонового задания, то не отключаем
-							'    Продолжить;
-							'КонецЕсли;
-							'//Если UserName = ИмяПользователя() Тогда
-							'//    // это текущий пользователь
-							'//    Продолжить;
-							'//КонецЕсли;
-                        Echo(CStr(Now) + " Отключено соединение: " + "User=["+UserName+"] ConnID=["+""+"] AppID=["+AppID+"]")
-                        ServerAgent.TerminateSession Claster, Session
-                    next
-
-                    if false then
-                        Echo(CStr(Now) + " Обработка списка соединений")
-                        Connections = ConnectToWorkProcess.GetInfoBaseConnections(InfoBase)
-                        For k = LBound(Connections) To UBound(Connections)
-                            Echo(CStr(Now) + " Разрываем соединение: Пользователь " + Connections(k).UserName + ", компьютер " + Connections(k).HostName + ", установлено " + CStr(Connections(k).ConnectedAt) + ", режим " + Connections(k).AppID)
-                            If Connections(k).AppID = "SrvrConsole" Then
-                                ' Не трогаем соединения консоли, оно никому не мешает
-                            ElseIf Connections(k).AppID = "COMConsole" Then
-                                ' Не трогаем соединения консоли, оно никому не мешает
-                            Else
-                                ConnectToWorkProcess.Disconnect(Connections(k))
-                                Echo(CStr(Now) + " Отключено соединение: Пользователь " + Connections(k).UserName + ", компьютер " + Connections(k).HostName + ", установлено " + CStr(Connections(k).ConnectedAt) + ", режим " + Connections(k).AppID)
-                            End If
-                        Next
-                    End If
-                End If
-
-                Echo(CStr(Now) + " Окончание завершения работы пользователей")
-
-            End If
-
-        Next
-
-    next
-
-    ComConnector = Null
-    ServerAgent = Null
-    Clasters = Null
-    WorkingProcesses = Null
-    ConnectToWorkProcess = Null
-    InfoBases = Null
-    InfoBase = Null
-    Connections = Null
+	Dim FindInfoBase
+    FindInfoBase = DisableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, TimeSleep)
 
     If NeedRestartAgent Then
-        RestartAgent TimeSleepShort
+        RestartAgent TimeSleep, TimeSleepShort
     End If
+
+    Dim strCommLine, sTempFile, LineExe
 
     If FindInfoBase Then
 
@@ -317,6 +137,7 @@ end if
 		if NeedUpdateFromStorage then
 			Echo(CStr(Now) + " Обновление конфигурации из хранилища")
 			
+			Dim strRepository, UpdateFromStorage
 			strRepository = " /ConfigurationRepositoryF"""+RepositoryPath+""""
 			strRepository = strRepository + " /ConfigurationRepositoryN"""+RepositoryAdminName + """ /ConfigurationRepositoryP"""+RepositoryAdminPass+""""
 			
@@ -357,38 +178,6 @@ end if
 		' также лог конфигуратора показываю в своем логе
 		Show1CConfigLog sTempFile, " Ошибка при обновлении базы данных"
 		
-        If FSO.FolderExists(Folder) = False Then
-            FSO.CreateFolder Folder
-        End if
-        
-        If NeedDumpIB = True Then
-            Echo(CStr(Now) + " выгружаем базу данных в архив") ' EchoWithOpenAndCloseLog
-			
-			formatDate = GetFormatDay
-			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-            LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /DumpIB""" + Folder + Prefix + formatDate + ".dt"" /Out""" + sTempFile + """ -NoTruncate"
-            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
-
-            wshShell.Run LineExe, 5, True
-
-			haveProblem = Show1CConfigLog(sTempFile, " Ошибка при выгрузке базы данных")
-			If Not haveProblem And NeedRestoreIB83 Then
-    			Echo(CStr(Now) + " Восстановление базы в 8.3")
-
-    			strCommLine = " /RestoreIB """ + Folder + Prefix + formatDate + ".dt"""
-
-    			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
-
-    			LineExe = """" + v83exe + """ DESIGNER /S """ + sFullServerName83 + "\" + InfoBaseName83 + """ /UC """ + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + strCommLine + " /Out """ + sTempFile +""""
-    			Echo(CStr(Now) + " ком.строка запуска: " + LineExe)
-
-    			wshShell.Run LineExe, 5, True
-
-    			Show1CConfigLog sTempFile, " Ошибка при загрузке базы из файла"
-			End If
-        End if
-		
         If NeedTestIB = True Then
             Echo(CStr(Now) + " тестируем базу и пересчитываем итоги.") ' EchoWithOpenAndCloseLog
 
@@ -407,21 +196,59 @@ end if
 
 			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
 
+            'EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, True
+
             LineExe = """" + v8exe + """ ENTERPRISE /CCLOSE /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /Out""" + sTempFile + """ -NoTruncate"
             Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
 
             wshShell.Run LineExe, 5, True
 
+    		'DisableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, TimeSleepShort
+
 			Show1CConfigLog sTempFile, " Ошибка при обновлении базы в режиме Предприятия"
         end if
 
+        If FSO.FolderExists(Folder) = False Then
+            FSO.CreateFolder Folder
+        End if
+        
+        If NeedDumpIB = True Then
+            Echo(CStr(Now) + " выгружаем базу данных в архив") ' EchoWithOpenAndCloseLog
+			
+			Dim formatDate
+			formatDate = GetFormatDay
+			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+            LineExe = """" + v8exe + """ DESIGNER /S""" + sFullServerName + "\" + InfoBaseName + """ /UC""" + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " /DumpIB""" + Folder + Prefix + formatDate + ".dt"" /Out""" + sTempFile + """ -NoTruncate"
+            Echo(CStr(Now) + " ком.строка: " + LineExe) ' EchoWithOpenAndCloseLog
+
+            wshShell.Run LineExe, 5, True
+
+            Dim haveProblem
+			haveProblem = Show1CConfigLog(sTempFile, " Ошибка при выгрузке базы данных")
+			If Not haveProblem And NeedRestoreIB83 Then
+    			Echo(CStr(Now) + " Восстановление базы в 8.3")
+
+    			strCommLine = " /RestoreIB """ + Folder + Prefix + formatDate + ".dt"""
+
+    			sTempFile = FSO.GetSpecialFolder(2) + "\" +FSO.GetTempName()
+
+    			LineExe = """" + v83exe + """ DESIGNER /S """ + sFullServerName83 + "\" + InfoBaseName83 + """ /UC """ + LockPermissionCode + """ /DisableStartupMessages " + AuthStr + " " + strCommLine + " /Out """ + sTempFile +""""
+    			Echo(CStr(Now) + " ком.строка запуска: " + LineExe)
+
+    			wshShell.Run LineExe, 5, True
+
+    			Show1CConfigLog sTempFile, " Ошибка при загрузке базы из файла"
+			End If
+        End if
+		
         'OpenLogFile
 
         Echo(CStr(Now) + " Установка разрешения подключения к ИБ")
 
         FindInfoBase = False
         
-        EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName
+        EnableConnections ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, False
 
     End If ' FindInfoBase
 
@@ -431,10 +258,12 @@ end if
         If fso.FileExists(NetFile) Then
             fso.DeleteFile(NetFile)
         End If
-Debug "Out", Out
-Debug "NetFile", NetFile
+        Debug "Out", Out
+		Debug "NetFile", NetFile
+
         fso.MoveFile Out, NetFile
-Debug "NetFile", NetFile
+        
+        Debug "NetFile", NetFile
     End if
 
     If NeedDumpIB = True Then 
@@ -445,6 +274,8 @@ Debug "NetFile", NetFile
 End Function
 
 Function Show1CConfigLog(sTempFile, errorMessage)
+	Dim configLogFile, haveProblem, errorString, errorPos
+
 	Set configLogFile = fso.OpenTextFile(sTempFile, 1)
 
 	haveProblem = false
@@ -467,6 +298,8 @@ End Function
 Sub WriteLogIntoIBEventLog(sFullServerName, InfoBaseName, sLogFile)
 		'Sub WriteLogIntoIBEventLog(ServerName, KlasterPortNumber, InfoBaseName, sLogFile)
     Echo(CStr(Now) + " Сохранение лога в журнал регистрации ИБ")
+    Dim ComConnector, connection
+
     Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
         'Set connection = ComConnector.Connect("Srvr=" + ServerName + ":" + CStr(KlasterPortNumber) + ";Ref=" + InfoBaseName + ";Usr=" + InfoBasesAdminName + ";Pwd=" + InfoBasesAdminPass)
     Set connection = ComConnector.Connect("Srvr=" + sFullServerName + ";Ref=" + InfoBaseName)
@@ -476,6 +309,7 @@ Sub WriteLogIntoIBEventLog(sFullServerName, InfoBaseName, sLogFile)
     'LogFile.Close()
     'LogFile = ""
 
+    Dim f, Text
     Set f = fso.OpenTextFile(sLogFile, 1, False, -2) 'Out
     Text = f.ReadAll
 
@@ -489,14 +323,192 @@ End Sub
 
 Function CreateCOMConnector()
     Echo(CStr(Now) + " Создание COM-коннектора <"+ strCOMConnector + ">")
+    Dim ComConnector
     Set ComConnector = CreateObject(strCOMConnector) ' CreateObject("v82.COMConnector")
 
     set CreateCOMConnector = ComConnector
 End Function
 
-Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName)
+Function DisableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, TimeSleep)
+    'Echo(CStr(Now) + " Создание COM-коннектора")
+    Dim ComConnector
+    Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
+
+    Echo(CStr(Now) + " Подключение к агенту сервера")
+    Dim ServerAgent
+    Set ServerAgent = ComConnector.ConnectAgent(sFullClusterName) ' ComConnector.ConnectAgent(ServerName)
+
+    Echo(CStr(Now) + " Получение массива кластеров сервера у агента сервера")
+    Dim Clasters
+    Clasters = ServerAgent.GetClusters()
+
+    Echo(CStr(Now) + " Начало завершения работы пользователей")
+
+    Echo(CStr(Now) + " Начало цикла нахождения необходимого кластера по имени")
+    Dim findClaster, i, Claster
+    findClaster = false
+    For i = LBound(Clasters) To UBound(Clasters)
+                'If Claster.MainPort = KlasterPortNumber Then
+        Set Claster = Clasters(i)
+
+        if (UCase(Claster.HostName) = UCase(ServerName)) then
+            findClaster = true
+            Exit for
+        End if
+    Next
+    if findClaster = false then
+        Echo(CStr(Now) + " Ошибка - не нашли кластер <"+sFullClusterName+">") 'ServerName
+        Exit Function
+    end if
+            
+    Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.ClusterName + ", "+Claster.HostName)
+	    'Echo(CStr(Now) + " Аутентикация к найденному кластеру: " + Claster.Name + ", "+Claster.HostName)
+ 
+    ServerAgent.Authenticate Claster, ClasterAdminName, ClasterAdminPass
+
+    Echo(CStr(Now) + " Получение списка работающих рабочих процессов и обход в цикле")
+
+    Dim WorkServers, WorkServer, WorkingProcesses
+    WorkServers = ServerAgent.GetWorkingServers(Claster)
+    For i = LBound(WorkServers) To UBound(WorkServers)
+        Set WorkServer = WorkServers(i)
+        Echo(CStr(Now) + " Обрабатываю рабочий сервер "+WorkServer.Name+": " + WorkServer.HostName)
+
+        WorkingProcesses = ServerAgent.GetServerWorkingProcesses(Claster, WorkServer)
+			'set WorkingProcesses = ServerAgent.GetWorkingProcesses(Claster, WorkServer)
+			'Если РабочиеПроцессы <> НЕОПРЕДЕЛЕНО Тогда
+
+		Dim FindInfoBase, j, ConnectToWorkProcess
+		FindInfoBase = false
+
+        For j = LBound(WorkingProcesses) To UBound(WorkingProcesses)
+
+            If WorkingProcesses(j).Running = 1 Then
+
+                Echo(CStr(Now) + " Создание соединения с рабочим процессом " + WorkingProcesses(j).HostName + ":" + CStr(WorkingProcesses(j).MainPort))
+                Set ConnectToWorkProcess = ComConnector.ConnectWorkingProcess("tcp://" + WorkingProcesses(j).HostName + ":" + CStr(WorkingProcesses(j).MainPort))
+
+                ConnectToWorkProcess.AuthenticateAdmin ClasterAdminName, ClasterAdminPass
+                ConnectToWorkProcess.AddAuthentication InfoBasesAdminName, InfoBasesAdminPass
+
+                If Not FindInfoBase Then
+
+                    Echo(CStr(Now) + " Получение списка ИБ рабочего процесса")
+                    Dim InfoBases, InfoBase
+                    InfoBases = ConnectToWorkProcess.GetInfoBases()
+
+                    Echo(CStr(Now) + " Поиск нужной ИБ")
+                    For h = LBound(InfoBases) To UBound(InfoBases)
+                        Echo(CStr(Now) + " Обрабатывается ИБ: " + InfoBases(h).Name)
+                        If LCase(InfoBases(h).Name) = LCase(InfoBaseName) Then
+                            Set InfoBase = InfoBases(h)
+                            FindInfoBase = True
+                            Echo(CStr(Now) + " Нашли нужную ИБ")
+                            Exit For
+                        End If
+                    Next
+
+                    If Not FindInfoBase Then
+                        Echo(CStr(Now) + " Не нашли нужную ИБ <"+InfoBaseName+">")
+                        Exit Function
+                    End If
+
+                    Echo(CStr(Now) + " Установка запрета на подключения к ИБ: " + InfoBase.Name)
+                    InfoBase.ConnectDenied = True
+                    InfoBase.ScheduledJobsDenied = True
+                    InfoBase.DeniedFrom = TimeBeginLock
+                    InfoBase.DeniedTo   = TimeEndLock
+                    InfoBase.DeniedMessage = LockMessageText
+                    InfoBase.PermissionCode = LockPermissionCode
+                    ConnectToWorkProcess.UpdateInfoBase(InfoBase)
+
+                    InfoBases = ServerAgent.GetInfoBases(Claster)
+
+                    Echo(CStr(Now) + " Поиск нужной ИБ для сессии")
+                    Dim h, InfoBaseSession
+                    For h = LBound(InfoBases) To UBound(InfoBases)
+                        Echo(CStr(Now) + " Обрабатывается ИБ: " + InfoBases(h).Name)
+                        If LCase(InfoBases(h).Name) = LCase(InfoBaseName) Then
+                            Set InfoBaseSession = InfoBases(h)
+								'FindInfoBase = True
+                            Echo(CStr(Now) + " Нашли нужную ИБ для сессии")
+                            Exit For
+                        End If
+                    Next
+
+                    ' Устанавливаем задержку выполнения
+                    Echo(CStr(Now) + " Задержка перед началом завершения работы пользователей "+CStr(TimeSleep/1000) + " секунд")
+                    'Echo(CStr(Now) + " Задержка перед началом завершения работы пользователей")
+                    'set WshShell = WScript.CreateObject("WScript.Shell")
+                    WScript.Sleep TimeSleep 
+
+                End If
+
+                If FindInfoBase Then
+	                Echo(CStr(Now) + " Начало завершение работы пользователей с ИБ " + InfoBase.Name)
+
+                    Echo(CStr(Now) + " Обработка списка сеансов")
+                    Dim Sessions, Session, k, UserName, AppID
+                    Sessions = ServerAgent.GetInfoBaseSessions(Claster, InfoBaseSession)
+                    For k = LBound(Sessions) To UBound(Sessions)
+                        Set Session = Sessions(k)
+                        UserName = Session.UserName
+							'ConnID    = Session.ConnID;
+                        AppID    = UCase(Session.AppID)        
+                        
+							'Если НЕ отключаемКонфигуратор И нРег(AppID) = "designer" Тогда
+							'//Если нРег(AppID) = "backgroundjob" ИЛИ нРег(AppID) = "designer" Тогда
+							'    // если это сеансы конфигуратора или фонового задания, то не отключаем
+							'    Продолжить;
+							'КонецЕсли;
+							'//Если UserName = ИмяПользователя() Тогда
+							'//    // это текущий пользователь
+							'//    Продолжить;
+							'//КонецЕсли;
+                        Echo(CStr(Now) + " Отключено соединение: " + "User=["+UserName+"] ConnID=["+""+"] AppID=["+AppID+"]")
+                        ServerAgent.TerminateSession Claster, Session
+                    next
+
+                    'if false then
+                    '    Echo(CStr(Now) + " Обработка списка соединений")
+                    '    Connections = ConnectToWorkProcess.GetInfoBaseConnections(InfoBase)
+                    '    For k = LBound(Connections) To UBound(Connections)
+                    '        Echo(CStr(Now) + " Разрываем соединение: Пользователь " + Connections(k).UserName + ", компьютер " + Connections(k).HostName + ", установлено " + CStr(Connections(k).ConnectedAt) + ", режим " + Connections(k).AppID)
+                    '        If Connections(k).AppID = "SrvrConsole" Then
+                    '            ' Не трогаем соединения консоли, оно никому не мешает
+                    '        ElseIf Connections(k).AppID = "COMConsole" Then
+                    '            ' Не трогаем соединения консоли, оно никому не мешает
+                    '        Else
+                    '            ConnectToWorkProcess.Disconnect(Connections(k))
+                    '            Echo(CStr(Now) + " Отключено соединение: Пользователь " + Connections(k).UserName + ", компьютер " + Connections(k).HostName + ", установлено " + CStr(Connections(k).ConnectedAt) + ", режим " + Connections(k).AppID)
+                    '        End If
+                    '    Next
+                    'End If
+
+	                Echo(CStr(Now) + " Окончание завершения работы пользователей")
+                End If
+
+            End If
+        Next
+    Next
+
+    ComConnector = Null
+    ServerAgent = Null
+    Clasters = Null
+    WorkingProcesses = Null
+    ConnectToWorkProcess = Null
+    InfoBases = Null
+    InfoBase = Null
+    'Connections = Null
+
+	DisableConnections = FindInfoBase
+End Function
+
+Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoBasesAdminName, InfoBasesAdminPass, InfoBaseName, ConnectionsOnly)
     EnableConnections = false
     
+    Dim ComConnector, ServerAgent, Clasters, Claster, findClaster, i, j, h
+
     Set ComConnector = CreateCOMConnector() ' CreateObject("v82.COMConnector")
     Set ServerAgent = ComConnector.ConnectAgent(sFullClusterName) 'ServerName)
     Clasters = ServerAgent.GetClusters()
@@ -520,6 +532,10 @@ Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoB
 
     'WorkingProcesses = ServerAgent.GetWorkingProcesses(Claster)
     
+    Dim WorkServers, WorkServer, WorkingProcesses, ConnectToWorkProcess, FindInfoBase
+
+    FindInfoBase = False
+
     WorkServers = ServerAgent.GetWorkingServers(Claster)
     For i = LBound(WorkServers) To UBound(WorkServers)
         Set WorkServer = WorkServers(i)
@@ -536,6 +552,7 @@ Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoB
                 ConnectToWorkProcess.AddAuthentication InfoBasesAdminName, InfoBasesAdminPass
 
                 ' Получаем список ИБ рабочего процесса
+                Dim InfoBases, InfoBase
                 InfoBases = ConnectToWorkProcess.GetInfoBases()
                 For h = LBound(InfoBases) To UBound(InfoBases)
                     If LCase(InfoBases(h).Name) = LCase(InfoBaseName) Then
@@ -548,7 +565,9 @@ Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoB
                 If FindInfoBase Then
                     ' Устанавливаем разрешение на подключение соединений
                     InfoBase.ConnectDenied = False
-                    InfoBase.ScheduledJobsDenied = false
+                    If Not ConnectionsOnly Then
+                        InfoBase.ScheduledJobsDenied = false
+                    End If
                     InfoBase.DeniedMessage = ""
                     InfoBase.PermissionCode = ""
                     ConnectToWorkProcess.UpdateInfoBase(InfoBase)
@@ -568,7 +587,7 @@ Function EnableConnections(ServerName, ClasterAdminName, ClasterAdminPass, InfoB
     EnableConnections = true
 End Function
 
-Sub RestartAgent(TimeSleepShort)
+Sub RestartAgent(TimeSleep, TimeSleepShort)
     Set objWMIService = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\cimv2")
     
     'Stop Service
@@ -606,6 +625,83 @@ Sub TerminateProcess(strProcessName)
     Next
 End Sub
 
+Sub LoadSettings()
+    ServerName = ResDict.Item(LCase("ServerName")) ' "WorkServer" 'Имя сервера БД
+    KlasterPortNumber = ResDict.Item(LCase("KlasterPortNumber")) ' 1541 'Номер пора кластера
+    InfoBaseName = ResDict.Item(LCase("InfoBaseName")) ' "myBase_User_01" 'Имя ИБ
+
+	sFullServerName = ServerName
+	sFullClusterName = ServerName
+	if "" <> CStr(KlasterPortNumber) then
+		sFullServerName = ServerName + ":" + CStr(KlasterPortNumber)
+		sFullClusterName = ServerName + ":" + CStr(CInt(KlasterPortNumber)-1)
+	end if
+
+    ServerName83 = ResDict.Item(LCase("ServerName83")) 
+    KlasterPortNumber83 = ResDict.Item(LCase("KlasterPortNumber83")) 
+    InfoBaseName83 = ResDict.Item(LCase("InfoBaseName83")) 
+
+	sFullServerName83 = ServerName83
+	if "" <> CStr(KlasterPortNumber83) then
+		sFullServerName83 = sFullServerName83 + ":" + CStr(KlasterPortNumber83)
+	end if
+
+    RepositoryPath = ResDict.Item(LCase("RepositoryPath")) ' "E:\Repository\test" ' путь к хранилищу
+
+		' ВАЖНО - база должна быть ранее зарегистрирована как server:port\baseName - например, WorkServer:1541\myBase_User_01
+		' если база была зарегистрирована как server\baseName (без указания порта) - при работе с хранилищем будет ошибка из-за измененения местонахождения информационной базы
+		' если такой регистрации не было, не удается загрузить изменения из хранилища
+
+    ' ВАЖНО не должен быть запущен процесс Конфигуратора с подключением к хранилищу с таким пользователем !
+    ' будет ошибка - (Пользователь уже аутентифицирован в хранилище.)
+
+    ClasterAdminName = ResDict.Item(LCase("ClasterAdminName")) ' "" 'Имя администратора кластера
+    ClasterAdminPass = ResDict.Item(LCase("ClasterAdminPass")) ' "" 'Пароль администратора кластера
+    InfoBasesAdminName = ResDict.Item(LCase("InfoBasesAdminName")) ' "Администратор1" 'Имя администратора ИБ
+    InfoBasesAdminPass = ResDict.Item(LCase("InfoBasesAdminPass")) ' "" 'Пароль администратора ИБ
+    RepositoryAdminName = ResDict.Item(LCase("RepositoryAdminName")) ' "Администратор" ' Имя администратора хранилища
+    RepositoryAdminPass = ResDict.Item(LCase("RepositoryAdminPass")) ' "" ' Пароль администратора хранилища
+
+		'FilePath = ResDict.Item(LCase("FilePath")) ' "\\WorkServer\Share\Admin1C\confupdate.vbs" 'Путь к текущему файлу
+    NetFile = ResDict.Item(LCase("NetFile")) ' "\\WorkServer\Share\Admin1C\confupdate_base.txt" 'Путь к log-файлу в сети - используется только для NeedCopyFiles = True
+
+    Folder = ResDict.Item(LCase("Folder")) ' "\\WorkServer\Share\Admin1C\" 'Каталог для выгрузки базы
+    CountDB = CInt(ResDict.Item(LCase("CountDB"))) ' 7 'За сколько дней хранить копии
+    Prefix = ResDict.Item(LCase("Prefix")) ' "base" 'Префикс файла выгрузки
+    Out = ResDict.Item(LCase(LCase("LogFile"))) ' "\\WorkServer\Share\Admin1C\confupdate.txt" 'Путь к log-файлу
+    sLogFile = Out
+    Debug "Out", Out
+
+		'UpdateFromStorage = ResDict.Item(LCase("UpdateFromStorage")) ' " /ConfigurationRepositoryUpdateCfg -v -force -revised " ' обновляем из хранилища
+
+	NeedUpdateFromStorage = UCase(ResDict.Item(LCase("NeedUpdateFromStorage"))) = "TRUE" ' Необходимость обновления конфигурации из хранилища конфигурации
+    NeedDumpIB = UCase(ResDict.Item(LCase("NeedDumpIB"))) = "TRUE" ' True ' Необходимость выгрузки базы
+    NeedCopyFiles = UCase(ResDict.Item(LCase("NeedCopyFiles"))) = "TRUE" ' True ' Необходимость выгрузки базы
+    NeedTestIB = UCase(ResDict.Item(LCase("NeedTestIB"))) = "TRUE" ' False ' Необходимость тестирования базы
+    NeedRestartAgent = UCase(ResDict.Item(LCase("NeedRestartAgent"))) = "TRUE" ' False ' Необходимость рестарта агента сервера
+    NeedRestoreIB = UCase(ResDict.Item(LCase("NeedRestoreIB"))) = "TRUE" ' Необходимость восстановления конфигурации из файла
+    NeedRestoreIB83 = UCase(ResDict.Item(LCase("NeedRestoreIB83"))) = "TRUE" ' Необходимость восстановления конфигурации из файла платформой 8.3
+    NeedStartIB = UCase(ResDict.Item(LCase("NeedStartIB"))) = "TRUE" ' Необходимость запуска 1С после обновления из хранилища для обновления в режиме Предприятия
+        
+    IBFile = ResDict.Item(LCase("IBFile")) ' "" 'Путь к файлу с выгрузкой базы
+    LockMessageText = ResDict.Item(LCase("LockMessageText")) ' "Идет регламент. Подождите..." 'Текст сообщения о блокировки подключений к ИБ
+    LockPermissionCode = ResDict.Item(LCase("LockPermissionCode")) ' "Артур" 'Ключ для запуска заблокированной ИБ
+    AuthStr = ResDict.Item(LCase("AuthStr")) ' "/WA+" 
+    TimeSleep = CLng(ResDict.Item(LCase("TimeSleep"))) ' 10000 '600000 '10 секунд 600 секунд
+
+    TimeSleepShort = CLng(ResDict.Item(LCase("TimeSleepShort"))) ' 2000 '60000 '2 секунд 60 секунд
+    Cfg = ResDict.Item(LCase("Cfg")) ' "" 'Путь к файлу с измененной конфигурацией
+    InfoCfgFile = ResDict.Item(LCase("InfoCfgFile")) ' "" 'Информация о файле обновления конфигурации
+    v8exe = ResDict.Item(LCase("v8exe")) ' "C:\Program Files (x86)\1cv82\8.2.18.96\bin\1cv8.exe" 'Путь к исполняемому файлу 1С:Предприятия 8.2
+	v83exe = ResDict.Item(LCase("v83exe"))
+		'rem NewPass = "" 'Новый пароль администратора, обновляющего ИБ
+    strCOMConnector = ResDict.Item(LCase("COMConnector"))
+
+
+    TimeBeginLock = Now ' Время начала блокировки ИБ
+    TimeEndLock = DateAdd("h", 2, TimeBeginLock) ' Время окончания блокировки ИБ
+End Sub
+
 ' Инициализация сценария
 Function Init( )
       Init = false
@@ -616,7 +712,8 @@ Function Init( )
     ' задать имя ini-файла
       Dim IniFileName
 
-        intOpMode = intParseCmdLine(IniFileName)
+      Dim intOpMode
+      intOpMode = intParseCmdLine(IniFileName)
 
 			' всегда один ini-файл в каталоге программы
 			'  IniFileName = Replace(LCase(WScript.ScriptFullName),".vbs",".ini")
@@ -723,7 +820,7 @@ Function GetDataFromIniFile(ByVal IniFileName, ByRef ResDict)
       reg.Pattern="^\s*([^=]+)\s*=\s*([^;']+)[;']?"
       reg.IgnoreCase = True
 
-    Dim elem, index
+    Dim elem, index, lkey, lvalue
 
     Do While IniFile.AtEndOfStream <> True
       s = IniFile.ReadLine
