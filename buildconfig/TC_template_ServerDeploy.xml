@@ -4,6 +4,9 @@
 <template>
   <name>ServerDeploy</name>
   <settings>
+    <options>
+      <option name="artifactRules" value="Scripts\v8Temp\source.cf" />
+    </options>
     <parameters>
       <param name="env.cluster_admin" value="" />
       <param name="env.cluster_admin_password" value="" />
@@ -14,6 +17,10 @@
       <param name="env.lock_message" value="&quot;Выполняются регламентные работы. Пожалуйста, подождите...&quot;" />
       <param name="env.server_host" value="WS-MSK-A2981" />
       <param name="oscript_path" value="c:\Users\aovsyankin\Documents\Visual Studio 2013\Projects\1Script\src\oscript\bin\x86\Release\oscript.exe" />
+      <param name="storage_connection" value="C:\Users\aovsyankin\Documents\1CDB\local_storage\temp" />
+      <param name="storage_password" value="" />
+      <param name="storage_user" value="Вася" />
+      <param name="v8_executable" value="c:\Program Files (x86)\1cv8\8.3.4.408\bin\1cv8.exe" />
     </parameters>
     <build-runners>
       <runner id="RUNNER_4" name="Блокировка и отключение пользователей" type="simpleRunner">
@@ -21,6 +28,15 @@
           <param name="script.content"><![CDATA[@echo off
 chcp 1251
 "%oscript_path%" %system.teamcity.build.checkoutDir%\Scripts\disconnect_users.os]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="RUNNER_5" name="Получение версии из хранилища" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[@echo off
+chcp 1251
+"%oscript_path%" "%system.teamcity.build.checkoutDir%"\Scripts\retrieve_storage.os "%v8_executable%" "%storage_connection%" "%storage_user%" "%storage_password%"]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
