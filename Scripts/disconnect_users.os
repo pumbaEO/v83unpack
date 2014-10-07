@@ -269,9 +269,10 @@
         UserName = Session.UserName;
         AppID    = ВРег(Session.AppID);
         
-        СообщениеСборки("Отключено соединение: " + "User=["+UserName+"] ConnID=["+""+"] AppID=["+AppID+"]");
+        СообщениеСборки("Попытка отключения: " + "User=["+UserName+"] ConnID=["+""+"] AppID=["+AppID+"]");
         ServerAgent.TerminateSession(Cluster, Session);
 		ОсвободитьОбъектКластера(Session);
+		СообщениеСборки("Выполнено");
 	КонецЦикла;
 	
 КонецПроцедуры
