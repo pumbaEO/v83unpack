@@ -2,7 +2,7 @@
 <!DOCTYPE template SYSTEM "../../../project-config.dtd">
 
 <template>
-  <name>ServerDeploy</name>
+  <name>DeployTemplate</name>
   <settings>
     <options>
       <option name="artifactRules" value="Scripts\v8Temp\source.cf" />
@@ -41,12 +41,34 @@ chcp 1251
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
+      <runner id="RUNNER_7" name="Обновление конфигурации ИБ" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[@echo off
+chcp 1251
+"%oscript_path%" "%system.teamcity.build.checkoutDir%"\Scripts\update_dbconf.os "%v8_executable%"]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+      <runner id="RUNNER_6" name="Снятие запрета на подключение" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[@echo off
+chcp 1251
+"%oscript_path%" %system.teamcity.build.checkoutDir%\Scripts\remove_lock.os]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
     </build-runners>
     <vcs-settings>
-      <vcs-entry-ref root-id="AutoDeployExperiments_HttpAoStashMaxusLan7990scmAutCdGit" />
+      <vcs-entry-ref root-id="Stash_CICD" />
     </vcs-settings>
     <requirements />
-    <build-triggers />
+    <build-triggers>
+      <build-trigger id="vcsTrigger" type="vcsTrigger">
+        <parameters />
+      </build-trigger>
+    </build-triggers>
     <cleanup />
   </settings>
 </template>
