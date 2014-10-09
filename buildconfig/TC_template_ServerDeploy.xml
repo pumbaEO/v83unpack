@@ -50,12 +50,21 @@ chcp 1251
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
+      <runner id="RUNNER_8" name="Обновить базу в режиме предприятие" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[@echo off
+chcp 1251
+"%oscript_path%" "%system.teamcity.build.checkoutDir%"\Scripts\update_enterprise.os "%v8_executable%"]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
       <runner id="RUNNER_6" name="Снятие запрета на подключение" type="simpleRunner">
         <parameters>
           <param name="script.content"><![CDATA[@echo off
 chcp 1251
 "%oscript_path%" %system.teamcity.build.checkoutDir%\Scripts\remove_lock.os]]></param>
-          <param name="teamcity.step.mode" value="default" />
+          <param name="teamcity.step.mode" value="execute_always" />
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
