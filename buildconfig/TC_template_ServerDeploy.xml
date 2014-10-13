@@ -8,6 +8,7 @@
       <option name="artifactRules" value="Scripts\v8Temp\source.cf" />
     </options>
     <parameters>
+      <param name="env.agent_port" value="" />
       <param name="env.cluster_admin" value="" />
       <param name="env.cluster_admin_password" value="" />
       <param name="env.com_connector" value="V83.ComConnector" />
