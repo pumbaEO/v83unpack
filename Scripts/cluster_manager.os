@@ -65,7 +65,7 @@
 		Clusters = ServerAgent.GetClusters();
 		
 		Cluster = НайтиКластерСерверов(Clusters, ИмяСервера);
-		СообщениеСборки("Аутентикация к найденному кластеру: " + Cluster.ClusterName + ", "+Cluster.HostName);
+		СообщениеСборки("Аутентикация к найденному кластеру: " + Cluster.HostName + ":" + Cluster.MainPort);
 		ServerAgent.Authenticate(Cluster, мНастройки.АдминистраторКластера, мНастройки.ПарольАдминистратораКластера);
 			
 		Дескриптор.Cluster = Cluster;
