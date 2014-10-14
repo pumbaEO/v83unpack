@@ -121,7 +121,7 @@
     InfoBase.ConnectDenied = Истина;
     InfoBase.ScheduledJobsDenied = Истина;
     InfoBase.DeniedMessage = мНастройки.СообщениеБлокировки;
-    InfoBase.PermissionCode = мНастройки.ПарольАдминистратораБазы;
+    InfoBase.PermissionCode = "AutoDeploy"; //мНастройки.ПарольАдминистратораБазы;
 	
 	Попытка
 		Дескриптор.ConnectToWorkProcess.UpdateInfoBase(InfoBase);
@@ -332,8 +332,10 @@
 				СообщениеСборки("Создание соединения с рабочим процессом " + СтрокаСоединения);
 				ConnectToWorkProcess = ComConnector.ConnectWorkingProcess(СтрокаСоединения);
 				
-				ConnectToWorkProcess.AuthenticateAdmin(мНастройки.АдминистраторКластера, мНастройки.ПарольАдминистратораКластера);
-				ConnectToWorkProcess.AddAuthentication(мНастройки.АдминистраторБазы, мНастройки.ПарольАдминистратораБазы);
+				СообщениеСборки("Авторизация в кластере: <"+мНастройки.АдминистраторКластера+">");
+				ConnectToWorkProcess.AuthenticateAdmin(""+мНастройки.АдминистраторКластера, ""+мНастройки.ПарольАдминистратораКластера);
+				СообщениеСборки("Авторизация в ИБ: <"+мНастройки.АдминистраторБазы+">");
+				ConnectToWorkProcess.AddAuthentication(""+мНастройки.АдминистраторБазы, ""+мНастройки.ПарольАдминистратораБазы);
 				
 				СоединениеСПроцессом = ConnectToWorkProcess;
 				Прервать;
