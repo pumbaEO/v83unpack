@@ -4,31 +4,28 @@
 <template>
   <name>DeployTemplate</name>
   <settings>
-    <options>
-      <option name="artifactRules" value="Scripts\v8Temp\source.cf" />
-    </options>
     <parameters>
-      <param name="env.agent_port" value="" />
+      <param name="env.agent_port" value="1540" />
       <param name="env.cluster_admin" value="" />
       <param name="env.cluster_admin_password" value="" />
       <param name="env.com_connector" value="V83.ComConnector" />
-      <param name="env.db_name" value="srv" />
+      <param name="env.db_name" value="" spec="text validationMode='not_empty' display='normal'" />
       <param name="env.db_password" value="" />
-      <param name="env.db_user" value="" />
+      <param name="env.db_user" value="" spec="text validationMode='not_empty' display='normal'" />
       <param name="env.lock_message" value="&quot;Выполняются регламентные работы. Пожалуйста, подождите...&quot;" />
-      <param name="env.server_host" value="WS-MSK-A2981" />
-      <param name="oscript_path" value="c:\Users\aovsyankin\Documents\Visual Studio 2013\Projects\1Script\src\oscript\bin\x86\Release\oscript.exe" />
-      <param name="storage_connection" value="C:\Users\aovsyankin\Documents\1CDB\local_storage\temp" />
+      <param name="env.server_host" value="" spec="text validationMode='not_empty' display='normal'" />
+      <param name="oscript_path" value="%teamcity.agent.tools.dir%\oscript\oscript.exe" spec="text validationMode='not_empty' label='Путь к интерпретатору OneScript' display='hidden'" />
+      <param name="storage_connection" value="" spec="text description='Путь к каталогу или адрес сервера в формате tcp://сервер|[:порт|]' validationMode='not_empty' label='Строка подключения к хранилищу' display='normal'" />
       <param name="storage_password" value="" />
-      <param name="storage_user" value="Вася" />
-      <param name="v8_executable" value="c:\Program Files (x86)\1cv8\8.3.4.408\bin\1cv8.exe" />
+      <param name="storage_user" value="" spec="text validationMode='not_empty' display='normal'" />
+      <param name="v8_executable" value="C:\Program Files (x86)\1cv8\8.3.4.408\bin\1cv8.exe" />
     </parameters>
     <build-runners>
       <runner id="RUNNER_4" name="Блокировка и отключение пользователей" type="simpleRunner">
         <parameters>
           <param name="script.content"><![CDATA[@echo off
 chcp 1251
-"%oscript_path%" %system.teamcity.build.checkoutDir%\Scripts\disconnect_users.os]]></param>
+"%oscript_path%" "%system.teamcity.build.checkoutDir%"\Scripts\disconnect_users.os]]></param>
           <param name="teamcity.step.mode" value="default" />
           <param name="use.custom.script" value="true" />
         </parameters>
@@ -64,21 +61,15 @@ chcp 1251
         <parameters>
           <param name="script.content"><![CDATA[@echo off
 chcp 1251
-"%oscript_path%" %system.teamcity.build.checkoutDir%\Scripts\remove_lock.os]]></param>
+"%oscript_path%" "%system.teamcity.build.checkoutDir%"\Scripts\remove_lock.os]]></param>
           <param name="teamcity.step.mode" value="execute_always" />
           <param name="use.custom.script" value="true" />
         </parameters>
       </runner>
     </build-runners>
-    <vcs-settings>
-      <vcs-entry-ref root-id="Stash_CICD" />
-    </vcs-settings>
+    <vcs-settings />
     <requirements />
-    <build-triggers>
-      <build-trigger id="vcsTrigger" type="vcsTrigger">
-        <parameters />
-      </build-trigger>
-    </build-triggers>
+    <build-triggers />
     <cleanup />
   </settings>
 </template>
