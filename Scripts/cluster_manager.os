@@ -93,7 +93,7 @@
     InfoBase.ConnectDenied = Истина;
     InfoBase.ScheduledJobsDenied = Истина;
     InfoBase.DeniedMessage = мНастройки.СообщениеБлокировки;
-    InfoBase.PermissionCode = "AutoDeploy"; //мНастройки.ПарольАдминистратораБазы;
+    InfoBase.PermissionCode = мНастройки.КодРазрешения;
 	
 	Попытка
 		Дескриптор.ConnectToWorkProcess.UpdateInfoBase(InfoBase);
