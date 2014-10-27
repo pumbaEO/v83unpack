@@ -5,9 +5,10 @@
   <name>GitSyncTemplate</name>
   <settings>
     <parameters>
+      <param name="env.git_executable" value="%env.ProgramFiles(x86)%\Git\cmd\git.exe" />
       <param name="env.git_local_repo" value="" />
       <param name="env.storage_dir" value="" />
-      <param name="env.v8_executable" value="C:\Program Files (x86)\1cv8\8.3.4.408\bin\1cv8.exe" />
+      <param name="env.v8_executable" value="%env.ProgramFiles(x86)%\1cv8\8.3.4.408\bin\1cv8.exe" />
       <param name="oscript_path" value="%teamcity.agent.tools.dir%\oscript\oscript.exe" />
     </parameters>
     <build-runners>
