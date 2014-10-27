@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE template SYSTEM "../../../project-config.dtd">
+
+<template>
+  <name>GitSyncTemplate</name>
+  <settings>
+    <parameters>
+      <param name="env.git_local_repo" value="" />
+      <param name="env.storage_dir" value="" />
+      <param name="env.v8_executable" value="C:\Program Files (x86)\1cv8\8.3.4.408\bin\1cv8.exe" />
+      <param name="oscript_path" value="%teamcity.agent.tools.dir%\oscript\oscript.exe" />
+    </parameters>
+    <build-runners>
+      <runner id="RUNNER_10" name="Синхронизировать хранилище с git" type="simpleRunner">
+        <parameters>
+          <param name="script.content"><![CDATA[@echo off
+chcp 1251 > nul
+
+"%oscript_path%" "%teamcity.agent.tools.dir%"\v8unpack\unpack-controller.os -env]]></param>
+          <param name="teamcity.step.mode" value="default" />
+          <param name="use.custom.script" value="true" />
+        </parameters>
+      </runner>
+    </build-runners>
+    <vcs-settings />
+    <requirements />
+    <build-triggers />
+    <cleanup />
+  </settings>
+</template>
+
