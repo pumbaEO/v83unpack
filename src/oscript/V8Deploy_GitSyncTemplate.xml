@@ -11,11 +11,10 @@
       <setting-ref ref="TRIGGER_6" />
     </disabled-settings>
     <parameters>
+      <param name="env.git_email_domain" value="" />
       <param name="env.git_executable" value="%env.ProgramFiles(x86)%\Git\cmd\git.exe" />
       <param name="env.git_local_repo" value="" />
-      <param name="env.git_password" value="zxx775d03cbe80d301b" spec="password display='normal'" />
       <param name="env.git_remote_repo" value="" />
-      <param name="env.git_user" value="" />
       <param name="env.storage_dir" value="" />
       <param name="env.v8_executable" value="%env.ProgramFiles(x86)%\1cv8\8.3.5.1248\bin\1cv8.exe" />
       <param name="oscript_path" value="%teamcity.agent.tools.dir%\oscript\oscript.exe" />
