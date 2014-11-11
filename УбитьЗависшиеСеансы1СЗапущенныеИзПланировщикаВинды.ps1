@@ -1,1 +1,0 @@
-Get-Process 1cv8c |where {$_.SessionID -eq 0} | Stop-Process
