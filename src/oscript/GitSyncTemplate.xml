@@ -24,6 +24,15 @@
         <parameters>
           <param name="script.content"><![CDATA[@echo off
 chcp 1251 > nul
+
+if "%%HOME%%"=="" (
+	set HOME=%%USERPROFILE%%
+)
+
+rem проверяем доступ к настройкам у Git
+git config --global -l > .\mygitconfig.txt
+type .\mygitconfig.txt
+
 cd /d "%teamcity.agent.tools.dir%"\v8unpack
 "%oscript_path%" "%teamcity.agent.tools.dir%"\v8unpack\unpack-controller.os -env]]></param>
           <param name="teamcity.step.mode" value="default" />
